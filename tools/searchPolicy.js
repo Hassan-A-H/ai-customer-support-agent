@@ -1,19 +1,14 @@
-import fs from "fs/promises";
+import { retrieveRelevantPolicies } from "../rag/retrieve.js";
 
 export async function searchPolicy(args) {
   const { query } = args;
 
-  const file = await fs.readFile("./data/policies.json", "utf-8");
-  const policies = JSON.parse(file);
+  const results = await retrieveRelevantPolicies(query);
 
-  const searchTerm = query.toLowerCase();
-
-  const results = policies.filter((policy) => {
-    return (
-      policy.title.toLowerCase().includes(searchTerm) ||
-      policy.content.toLowerCase().includes(searchTerm)
-    );
-  });
-
-  return results;
+  return results.map((result) => ({
+    id: result.id,
+    title: result.title,
+    content: result.text,
+    similarity: result.similarity,
+  }));
 }
