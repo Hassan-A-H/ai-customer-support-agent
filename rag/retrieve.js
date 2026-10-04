@@ -2,7 +2,11 @@ import fs from "fs/promises";
 import { createEmbedding } from "./embeddings.js";
 import { cosineSimilarity } from "./similarity.js";
 
-export async function retrieveRelevantPolicies(query, topK = 2) {
+export async function retrieveRelevantPolicies(
+  query,
+  topK = 2,
+  minSimilarity = 0.2
+) {
   // 1. Create an embedding for the user's question
   const queryEmbedding = await createEmbedding(query);
 
@@ -27,6 +31,12 @@ export async function retrieveRelevantPolicies(query, topK = 2) {
   // 4. Highest similarity first
   results.sort((a, b) => b.similarity - a.similarity);
 
-  // 5. Return only the best matches
-  return results.slice(0, topK);
+
+  // 5. Ignore documents whose similarity is below the relevance threshold
+  const relevantResults = results.filter(
+    (result) => result.similarity >= minSimilarity
+  );
+
+  // 6. Return at most the top K relevant documents
+  return relevantResults.slice(0, topK);
 }

@@ -2,6 +2,9 @@ import OpenAI from "openai";
 import "dotenv/config";
 import readline from "readline/promises";
 import { stdin as input, stdout as output } from "process";
+import { calculate } from "./tools/calculate.js";
+import { getCurrentTime } from "./tools/getCurrentTime.js";
+import { getWeather } from "./tools/getWeather.js";
 import { getOrder } from "./tools/getOrder.js";
 import { getCustomer } from "./tools/getCustomer.js";
 import { searchProducts } from "./tools/searchProducts.js";
@@ -16,99 +19,6 @@ const client = new OpenAI({
 // -------------------------
 // 1. Tools
 // -------------------------
-
-function calculate(args) {
-  const { a, b, operator } = args;
-
-  switch (operator) {
-    case "+":
-      return a + b;
-
-    case "-":
-      return a - b;
-
-    case "*":
-      return a * b;
-
-    case "/":
-      if (b === 0) {
-        throw new Error("Cannot divide by zero");
-      }
-      return a / b;
-
-    default:
-      throw new Error(`Unknown operator: ${operator}`);
-  }
-}
-
-function getCurrentTime(args) {
-  return new Date().toLocaleTimeString();
-}
-
-function getWeatherDescription(code) {
-  const descriptions = {
-    0: "Clear sky",
-    1: "Mainly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Fog",
-    48: "Depositing rime fog",
-    51: "Light drizzle",
-    53: "Moderate drizzle",
-    55: "Dense drizzle",
-    61: "Slight rain",
-    63: "Moderate rain",
-    65: "Heavy rain",
-    71: "Slight snow",
-    73: "Moderate snow",
-    75: "Heavy snow",
-    80: "Slight rain showers",
-    81: "Moderate rain showers",
-    82: "Violent rain showers",
-    95: "Thunderstorm",
-    96: "Thunderstorm with slight hail",
-    99: "Thunderstorm with heavy hail",
-  };
-
-  return descriptions[code] ?? "Unknown weather condition";
-}
-
-async function getWeather(args) {
-  const { city } = args;
-
-  // Step 1: Find the city's coordinates
-  const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
-
-  const geocodingResponse = await fetch(geocodingUrl);
-  const geocodingData = await geocodingResponse.json();
-
-  if (!geocodingData.results || geocodingData.results.length === 0) {
-    throw new Error(`Could not find city: ${city}`);
-  }
-
-  const location = geocodingData.results[0];
-
-  // Step 2: Get weather for those coordinates
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto`;
-
-  const weatherResponse = await fetch(weatherUrl);
-  const weatherData = await weatherResponse.json();
-
-  if (!weatherResponse.ok) {
-    throw new Error("Weather API request failed");
-  }
-  const weatherCode = weatherData.current.weather_code;
-
-  return {
-    city: location.name,
-    country: location.country,
-    temperature: weatherData.current.temperature_2m,
-    apparentTemperature: weatherData.current.apparent_temperature,
-    condition: getWeatherDescription(weatherCode),
-    windSpeed: weatherData.current.wind_speed_10m,
-    unit: weatherData.current_units.temperature_2m,
-  };
-}
 
 // -------------------------
 // 2. Tool registry
@@ -234,7 +144,7 @@ search_policy: {
       type: "function",
       function: {
         name: "get_current_time",
-        description: "Get the current local time.",
+        description: "Get the current local date and time.",
         parameters: {
           type: "object",
           properties: {},
@@ -287,16 +197,41 @@ const messages = [
   {
     role: "system",
     content: `
-You are an AI agent that can use tools.
+You are an AI customer support agent that can use tools.
 
 Rules:
+
 1. Use tools when they are appropriate.
+
 2. Tool results are authoritative.
+
 3. Never change numerical values returned by tools.
+
 4. Never invent information that is not supported by the conversation or tool results.
-5. If a tool returns an error, explain the error honestly.
-`,
-  },
+
+5. Clearly distinguish between:
+   - general company policy information
+   - information about the customer's specific order or situation
+
+6. Do not assume that a customer satisfies a policy condition unless
+   the conversation or a tool result provides evidence for it.
+
+7. If information about a customer's specific order is required,
+   use the appropriate customer or order tool.
+
+8. If the available tools do not provide enough information to answer
+   a question reliably, say so instead of guessing.
+
+9. If a tool returns an error, explain the error honestly.
+
+10. Treat estimated dates, expected dates, and predicted values as estimates.
+    Never present an estimated value as an actual confirmed value.
+
+11. If a policy depends on an actual event, such as delivery,
+    payment, or cancellation, do not assume that the event happened
+    merely because an estimated date has passed or is available.
+`
+  }
 ];
 
 // -------------------------
