@@ -1,0 +1,14 @@
+[
+  {
+    "id": "C001",
+    "name": "Anna Müller",
+    "email": "anna@example.com",
+    "phone": "+49 151 12345678"
+  },
+  {
+    "id": "C002",
+    "name": "John Smith",
+    "email": "john@example.com",
+    "phone": "+49 152 98765432"
+  }
+]

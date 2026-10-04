@@ -1,0 +1,26 @@
+[
+  {
+    "id": "O1001",
+    "customerId": "C001",
+    "status": "shipped",
+    "productId": "P001",
+    "price": 79.99,
+    "estimatedDelivery": "2026-10-05"
+  },
+  {
+    "id": "O1002",
+    "customerId": "C002",
+    "status": "processing",
+    "productId": "P002",
+    "price": 149.99,
+    "estimatedDelivery": "2026-10-07"
+  },
+  {
+    "id": "O1003",
+    "customerId": "C001",
+    "status": "delivered",
+    "productId": "P003",
+    "price": 39.99,
+    "estimatedDelivery": "2026-09-28"
+  }
+]

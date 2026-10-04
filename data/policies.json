@@ -1,0 +1,22 @@
+[
+  {
+    "id": "return_policy",
+    "title": "Return Policy",
+    "content": "Customers can return products within 30 days of delivery. Products must be unused and in their original packaging. The customer is responsible for return shipping costs unless the product is defective."
+  },
+  {
+    "id": "refund_policy",
+    "title": "Refund Policy",
+    "content": "Refunds are issued after the returned product has been received and inspected. Refunds are normally processed within 5 business days after inspection."
+  },
+  {
+    "id": "shipping_policy",
+    "title": "Shipping Policy",
+    "content": "Orders are normally processed within 1 to 2 business days. Standard shipping usually takes 2 to 5 business days after processing."
+  },
+  {
+    "id": "cancellation_policy",
+    "title": "Order Cancellation Policy",
+    "content": "Customers can cancel an order while it is still processing. Orders that have already been shipped cannot normally be cancelled."
+  }
+]
