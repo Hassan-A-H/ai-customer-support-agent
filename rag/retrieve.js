@@ -5,38 +5,55 @@ import { cosineSimilarity } from "./similarity.js";
 export async function retrieveRelevantPolicies(
   query,
   topK = 2,
-  minSimilarity = 0.2
+  minSimilarity = 0.6,
 ) {
-  // 1. Create an embedding for the user's question
+  // Create an embedding for the user's question.
   const queryEmbedding = await createEmbedding(query);
 
-  // 2. Load our stored policy embeddings
-  const file = await fs.readFile(
-    "./data/policyEmbeddings.json",
-    "utf-8"
-  );
+  const file = await fs.readFile("./data/policyEmbeddings.json", "utf-8");
 
   const documents = JSON.parse(file);
 
-  // 3. Calculate similarity between the question
-  //    and every stored policy
-  const results = documents.map((document) => ({
+  // Compare the question with every stored chunk.
+  const scoredChunks = documents.map((document) => ({
     ...document,
-    similarity: cosineSimilarity(
-      queryEmbedding,
-      document.embedding
-    ),
+    similarity: cosineSimilarity(queryEmbedding, document.embedding),
   }));
 
-  // 4. Highest similarity first
-  results.sort((a, b) => b.similarity - a.similarity);
-
-
-  // 5. Ignore documents whose similarity is below the relevance threshold
-  const relevantResults = results.filter(
-    (result) => result.similarity >= minSimilarity
+  // Remove chunks that are below our relevance threshold.
+  const relevantChunks = scoredChunks.filter(
+    (chunk) => chunk.similarity >= minSimilarity,
   );
 
-  // 6. Return at most the top K relevant documents
-  return relevantResults.slice(0, topK);
+  // Group chunks belonging to the same policy.
+  const policyGroups = new Map();
+
+  for (const chunk of relevantChunks) {
+    if (!policyGroups.has(chunk.policyId)) {
+      policyGroups.set(chunk.policyId, {
+        policyId: chunk.policyId,
+        title: chunk.title,
+        chunks: [],
+      });
+    }
+
+    policyGroups.get(chunk.policyId).chunks.push(chunk);
+  }
+
+  // Sort the chunks inside each policy by relevance.
+  for (const policy of policyGroups.values()) {
+    policy.chunks.sort((a, b) => b.similarity - a.similarity);
+
+    // The policy's score is the similarity of its
+    // most relevant chunk.
+    policy.score = policy.chunks[0].similarity;
+  }
+
+  // Rank policies by their best matching chunk.
+  const policies = Array.from(policyGroups.values());
+
+  policies.sort((a, b) => b.score - a.score);
+
+  // Return only the most relevant policies.
+  return policies.slice(0, topK);
 }

@@ -46,8 +46,12 @@ for (const testCase of testCases) {
   // Display the retrieved policies and their similarity scores.
   for (const [index, result] of results.entries()) {
     console.log(
-      `${index + 1}. ${result.id} (${result.similarity.toFixed(3)})`
+      `${index + 1}. ${result.policyId} (${result.score.toFixed(3)})`,
     );
+
+    for (const chunk of result.chunks) {
+      console.log(`   - ${chunk.id} (${chunk.similarity.toFixed(3)})`);
+    }
   }
 
   // Handle queries where we expect no relevant policy.
@@ -65,7 +69,7 @@ for (const testCase of testCases) {
   // Check whether the first retrieved document is the expected one.
   const topResult = results[0];
 
-  if (topResult?.id === testCase.expected) {
+  if (topResult?.policyId === testCase.expected) {
     top1Correct++;
     console.log("✅ Top-1 correct");
   } else {
@@ -78,7 +82,7 @@ for (const testCase of testCases) {
   // This is important because our RAG system retrieves multiple
   // documents and sends them to the LLM.
   const foundInTopK = results.some(
-    (result) => result.id === testCase.expected
+    (result) => result.policyId === testCase.expected,
   );
 
   if (foundInTopK) {
@@ -91,7 +95,7 @@ for (const testCase of testCases) {
 
 // The unrelated test case does not count toward retrieval accuracy.
 const relevantTestCases = testCases.filter(
-  (testCase) => testCase.expected !== null
+  (testCase) => testCase.expected !== null,
 );
 
 console.log("\n================================");
@@ -99,12 +103,8 @@ console.log("Evaluation Summary");
 
 // Top-1 accuracy measures how often the correct document
 // was ranked as the #1 result.
-console.log(
-  `Top-1 accuracy: ${top1Correct}/${relevantTestCases.length}`
-);
+console.log(`Top-1 accuracy: ${top1Correct}/${relevantTestCases.length}`);
 
 // Top-K recall measures how often the correct document
 // appeared anywhere in the retrieved results.
-console.log(
-  `Top-K recall: ${topKCorrect}/${relevantTestCases.length}`
-);
+console.log(`Top-K recall: ${topKCorrect}/${relevantTestCases.length}`);

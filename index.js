@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { generateWithFallback } from "./llm/generate.js";
 import "dotenv/config";
 import readline from "readline/promises";
 import { stdin as input, stdout as output } from "process";
@@ -9,12 +9,9 @@ import { getOrder } from "./tools/getOrder.js";
 import { getCustomer } from "./tools/getCustomer.js";
 import { searchProducts } from "./tools/searchProducts.js";
 import { searchPolicy } from "./tools/searchPolicy.js";
-
-
-const client = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
+import { createSupportTicket } from "./tools/createSupportTicket.js";
+import { requestApproval } from "./tools/requestApproval.js";
+import { cancelOrder } from "./tools/cancelOrder.js";
 
 // -------------------------
 // 1. Tools
@@ -26,88 +23,174 @@ const client = new OpenAI({
 
 const toolRegistry = {
   get_order: {
-  definition: {
-    type: "function",
-    function: {
-      name: "get_order",
-      description: "Get information about a customer order.",
-      parameters: {
-        type: "object",
-        properties: {
-          orderId: {
-            type: "string",
-            description: "The ID of the order to look up."
-          }
+    definition: {
+      type: "function",
+      function: {
+        name: "get_order",
+        description: "Get information about a customer order.",
+        parameters: {
+          type: "object",
+          properties: {
+            orderId: {
+              type: "string",
+              description: "The ID of the order to look up.",
+            },
+          },
+          required: ["orderId"],
         },
-        required: ["orderId"]
-      }
-    }
-  },
+      },
+    },
 
-  execute: getOrder
-},
-get_customer: {
-  definition: {
-    type: "function",
-    function: {
-      name: "get_customer",
-      description: "Get information about a customer.",
-      parameters: {
-        type: "object",
-        properties: {
-          customerId: {
-            type: "string",
-            description: "The ID of the customer to look up."
-          }
-        },
-        required: ["customerId"]
-      }
-    }
+    execute: getOrder,
   },
+  get_customer: {
+    definition: {
+      type: "function",
+      function: {
+        name: "get_customer",
+        description: "Get information about a customer.",
+        parameters: {
+          type: "object",
+          properties: {
+            customerId: {
+              type: "string",
+              description: "The ID of the customer to look up.",
+            },
+          },
+          required: ["customerId"],
+        },
+      },
+    },
 
-  execute: getCustomer
-},
-search_products: {
-  definition: {
-    type: "function",
-    function: {
-      name: "search_products",
-      description: "Search the product catalog for products matching a query.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "The product name, category, or keyword to search for."
-          }
-        },
-        required: ["query"]
-      }
-    }
+    execute: getCustomer,
   },
+  search_products: {
+    definition: {
+      type: "function",
+      function: {
+        name: "search_products",
+        description:
+          "Search the product catalog for products matching a query.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description:
+                "The product name, category, or keyword to search for.",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    },
 
-  execute: searchProducts
-},
-search_policy: {
-  definition: {
-    type: "function",
-    function: {
-      name: "search_policy",
-      description: "Search the company's policies for information relevant to a customer question.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "The policy topic or customer question to search for."
-          }
-        },
-        required: ["query"]
-      }
-    }
+    execute: searchProducts,
   },
-  execute: searchPolicy
-},
+  search_policy: {
+    definition: {
+      type: "function",
+      function: {
+        name: "search_policy",
+        description:
+          "Search the company's policies for information relevant to a customer question.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description:
+                "The policy topic or customer question to search for.",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    execute: searchPolicy,
+  },
+  create_support_ticket: {
+    definition: {
+      type: "function",
+      function: {
+        name: "create_support_ticket",
+        description: "Create a support ticket for a customer issue.",
+        parameters: {
+          type: "object",
+          properties: {
+            customerId: {
+              type: "string",
+              description: "The customer's ID.",
+            },
+            orderId: {
+              type: "string",
+              description: "The order ID related to the issue.",
+            },
+            subject: {
+              type: "string",
+              description: "A short title describing the customer's issue.",
+            },
+            description: {
+              type: "string",
+              description: "A detailed description of the customer's issue.",
+            },
+          },
+          required: ["customerId", "orderId", "subject", "description"],
+        },
+      },
+    },
+    execute: createSupportTicket,
+  },
+  request_approval: {
+    definition: {
+      type: "function",
+      function: {
+        name: "request_approval",
+        description:
+          "Request human approval before performing a sensitive business action.",
+        parameters: {
+          type: "object",
+          properties: {
+            action: {
+              type: "string",
+              description: "The action that requires approval.",
+            },
+            reason: {
+              type: "string",
+              description: "Why the action is being requested.",
+            },
+            details: {
+              type: "object",
+              description: "Details needed to understand the requested action.",
+            },
+          },
+          required: ["action", "reason", "details"],
+        },
+      },
+    },
+    execute: requestApproval,
+  },
+  cancel_order: {
+    definition: {
+      type: "function",
+      function: {
+        name: "cancel_order",
+        description:
+          "Cancel an order. This action is sensitive and requires human approval before execution.",
+        parameters: {
+          type: "object",
+          properties: {
+            orderId: {
+              type: "string",
+              description: "The ID of the order to cancel.",
+            },
+          },
+          required: ["orderId"],
+        },
+      },
+    },
+    execute: cancelOrder,
+  },
   calculate: {
     definition: {
       type: "function",
@@ -178,7 +261,9 @@ search_policy: {
   },
 };
 
-const tools = Object.values(toolRegistry).map((tool) => tool.definition);
+const tools = Object.values(toolRegistry)
+  .filter((tool) => tool.definition.function.name !== "request_approval")
+  .map((tool) => tool.definition);
 
 // -------------------------
 // 3. Create terminal interface
@@ -230,9 +315,15 @@ Rules:
 11. If a policy depends on an actual event, such as delivery,
     payment, or cancellation, do not assume that the event happened
     merely because an estimated date has passed or is available.
-`
-  }
+`,
+  },
 ];
+
+// -------------------------
+// Sensitive tools
+// -------------------------
+
+const sensitiveTools = new Set(["cancel_order"]);
 
 // -------------------------
 // 5. Conversation loop
@@ -269,11 +360,7 @@ while (true) {
 
     console.log("\nThinking...\n");
 
-    const response = await client.chat.completions.create({
-      model: "openrouter/free",
-      messages,
-      tools,
-    });
+    const response = await generateWithFallback(messages, tools);
 
     const assistantMessage = response.choices[0].message;
     const toolCalls = assistantMessage.tool_calls;
@@ -322,7 +409,29 @@ while (true) {
       }
 
       try {
-        const result = await toolEntry.execute(arguments_);
+        let result;
+
+        if (sensitiveTools.has(toolName)) {
+          const approval = await rl.question(
+            `\n⚠️ This action requires human approval.\n` +
+              `Action: ${toolName}\n` +
+              `Arguments: ${JSON.stringify(arguments_)}\n` +
+              `Approve? (yes/no): `,
+          );
+
+          if (approval.toLowerCase() !== "yes") {
+            result = {
+              approved: false,
+              status: "rejected",
+              action: toolName,
+              message: "The human operator rejected this action.",
+            };
+          } else {
+            result = await toolEntry.execute(arguments_);
+          }
+        } else {
+          result = await toolEntry.execute(arguments_);
+        }
 
         console.log("Tool result:", result);
 
@@ -343,10 +452,10 @@ while (true) {
     }
   }
 }
-  // -------------------------
-  // 9. Close terminal interface
-  // -------------------------
+// -------------------------
+// 9. Close terminal interface
+// -------------------------
 
-  rl.close();
+rl.close();
 
-  console.log("\nGoodbye!");
+console.log("\nGoodbye!");

@@ -1,6 +1,6 @@
 # AI Customer Support Agent
 
-An AI-powered customer support agent built with Node.js, OpenRouter, tool calling, and Retrieval-Augmented Generation (RAG).
+An AI-powered customer support agent built with Node.js, tool calling, Retrieval-Augmented Generation (RAG), and multiple LLM providers with automatic fallback.
 
 This project is mainly a learning project for understanding how AI agents work internally, rather than relying completely on agent frameworks.
 
@@ -24,21 +24,23 @@ The current system follows this general flow:
 
 ```text
 User
- ↓
+  ↓
 AI Agent
- ↓
+  ↓
+LLM Provider Layer
+  ↓
 LLM
- ↓
+  ↓
 Tool Calling
- ↓
+  ↓
 Tools / RAG
- ↓
-Data
- ↓
+  ↓
+Business Data
+  ↓
 Tool Result
- ↓
+  ↓
 LLM
- ↓
+  ↓
 Final Answer
 ```
 
@@ -52,8 +54,11 @@ The LLM decides which tool should be used, while the Node.js application execute
 
 - Node.js
 - JavaScript
-- OpenRouter
 - OpenAI SDK
+- OpenRouter
+- Google Gemini
+- Groq
+- Tool Calling
 - Embeddings
 - Cosine Similarity
 - Retrieval-Augmented Generation (RAG)
@@ -73,15 +78,24 @@ ai-agent-basics/
 │   ├── policies.json
 │   └── products.json
 │
+├── llm/
+│   ├── generate.js
+│   └── providers/
+│       ├── openrouter.js
+│       ├── gemini.js
+│       └── groq.js
+│
 ├── rag/
 │   ├── documents.js
 │   ├── embeddings.js
 │   ├── indexDocuments.js
 │   ├── retrieve.js
 │   ├── similarity.js
+│   ├── evaluateRetrieval.js
+│   ├── testChunking.js
+│   ├── testEmbedding.js
 │   ├── testRetrieval.js
-│   ├── testSimilarity.js
-│   └── evaluateRetrieval.js
+│   └── testSearchPolicy.js
 │
 ├── tools/
 │   ├── calculate.js
@@ -125,9 +139,49 @@ Create a `.env` file:
 
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
 Do not commit the `.env` file to Git.
+
+---
+
+## LLM Provider Fallback
+
+The application does not depend on a single LLM provider.
+
+The provider layer currently supports:
+
+1. OpenRouter
+2. Google Gemini
+3. Groq
+
+The providers are attempted in order.
+
+```text
+OpenRouter
+    ↓
+failure
+    ↓
+Gemini
+    ↓
+failure
+    ↓
+Groq
+```
+
+---
+
+## Running the Agent
+
+Start the agent with:
+
+```bash
+node index.js
+```
+
+The agent can answer customer questions and use the available tools and RAG system when necessary.
 
 ---
 
@@ -169,10 +223,10 @@ For example:
 
 ```text
 Query:
-Can I send my keyboard back?
+Can I return my keyboard within 30 days?
 
 Result:
-Return Policy
+return_policy
 ```
 
 The system converts the query into an embedding and compares it with the embeddings of the stored policies.
@@ -186,6 +240,8 @@ The current RAG pipeline works as follows:
 ```text
 Policy documents
       ↓
+Split documents into chunks
+      ↓
 Create embeddings
       ↓
 Store embeddings
@@ -196,13 +252,15 @@ Create query embedding
       ↓
 Calculate cosine similarity
       ↓
-Sort by similarity
-      ↓
 Apply relevance threshold
       ↓
-Return top relevant policies
+Group relevant chunks by policy
       ↓
-LLM uses the retrieved information
+Rank policies
+      ↓
+Return relevant policies
+      ↓
+LLM uses retrieved information
 ```
 
 ### Embeddings
@@ -245,7 +303,7 @@ For example:
 
 ```js
 const relevantResults = results.filter(
-  (result) => result.similarity >= minSimilarity
+  (result) => result.similarity >= minSimilarity,
 );
 ```
 
@@ -286,7 +344,14 @@ The evaluation currently tests questions about:
 - Cancellation
 - Unrelated questions
 
-The purpose is to measure whether the correct document is retrieved as the top result.
+The current evaluation achieved:
+
+```text
+Top-1 accuracy: 5/5
+Top-K recall:   5/5
+```
+
+The evaluation is intentionally small at this stage and will be expanded as the system becomes more realistic.
 
 ---
 
@@ -297,14 +362,18 @@ This is currently a learning prototype.
 Some limitations include:
 
 - Policies are stored as JSON files
-- Each complete policy is currently treated as one document
-- Embeddings are regenerated manually
+- Customer, order, and product data are stored as JSON files
+- Embeddings are generated manually
 - There is no vector database
-- Retrieval uses semantic similarity
+- Retrieval uses a file-based approach
 - The relevance threshold is manually configured
 - There is no authentication
 - There is no production database
-- Some customer-support actions still require implementation
+- Business actions have not yet been implemented
+- There is no human approval workflow
+- There is no backend API
+- There is no web interface
+- Observability and production monitoring are still limited
 
 ---
 
@@ -312,18 +381,20 @@ Some limitations include:
 
 The project will gradually evolve with features such as:
 
-1. Better RAG document chunking
-2. Retrieval evaluation
-3. Improved relevance filtering
-4. Customer and order tools
-5. Support ticket creation
-6. Human approval for sensitive actions
-7. Backend API
-8. React frontend
-9. Conversation state
-10. Better observability and logging
-11. More realistic business data
-12. Production-oriented architecture
+1. Business actions
+2. Support ticket creation
+3. Human approval for sensitive actions
+4. Permission boundaries
+5. Backend API
+6. React frontend
+7. Database integration
+8. Conversation state
+9. Better observability and logging
+10. More realistic business data
+11. Automated testing
+12. Dockerization
+13. Deployment
+14. Production-oriented architecture
 
 ---
 

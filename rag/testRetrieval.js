@@ -1,8 +1,8 @@
 import { retrieveRelevantPolicies } from "./retrieve.js";
 
-const query = "I want to cancel my order.";
+const query = "Can I return my keyboard within 30 days?";
 
-const results = await retrieveRelevantPolicies(query);
+const results = await retrieveRelevantPolicies(query, 9, 0);
 
 for (const result of results) {
   console.log("\n---");

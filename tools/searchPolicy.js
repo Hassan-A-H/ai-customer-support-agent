@@ -3,12 +3,16 @@ import { retrieveRelevantPolicies } from "../rag/retrieve.js";
 export async function searchPolicy(args) {
   const { query } = args;
 
-  const results = await retrieveRelevantPolicies(query);
+  const policies = await retrieveRelevantPolicies(query);
 
-  return results.map((result) => ({
-    id: result.id,
-    title: result.title,
-    content: result.text,
-    similarity: result.similarity,
+  return policies.map((policy) => ({
+    policyId: policy.policyId,
+    title: policy.title,
+    score: policy.score,
+    chunks: policy.chunks.map((chunk) => ({
+      chunkId: chunk.id,
+      content: chunk.text,
+      similarity: chunk.similarity,
+    })),
   }));
 }
