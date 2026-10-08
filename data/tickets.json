@@ -16,5 +16,14 @@
     "description": "The customer reported that order O1001 arrived damaged.",
     "status": "open",
     "createdAt": "2026-10-04T23:44:20.412Z"
+  },
+  {
+    "id": "T1003",
+    "customerId": "C002",
+    "orderId": "O1002",
+    "subject": "Cancellation Request for Order O1002",
+    "description": "Customer requested cancellation of order O1002. Order is currently in processing status with estimated delivery on 2026-10-07. Requires human approval for cancellation.",
+    "status": "open",
+    "createdAt": "2026-10-08T06:34:42.608Z"
   }
 ]

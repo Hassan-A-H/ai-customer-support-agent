@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 
 function App() {
@@ -48,6 +49,9 @@ function App() {
   // while the agent is processing the current one.
   const [loading, setLoading] = useState(false);
 
+  // Stores a sensitive action that is waiting for human approval.
+  const [pendingApproval, setPendingApproval] = useState(null);
+
   async function handleSend() {
     // Ignore empty messages or messages sent while waiting
     // for the backend response.
@@ -91,14 +95,37 @@ function App() {
 
       const data = await response.json();
 
-      // Add the agent's response to the chat.
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        {
-          role: "assistant",
-          content: data.message || data.error || "No response received.",
-        },
-      ]);
+      // If the agent wants to perform a sensitive action,
+      // keep the action details in React state so the UI
+      // can ask the human for approval.
+      if (data.requiresApproval) {
+        // Show a normal assistant message explaining why
+        // the approval card appeared.
+        setMessages((currentMessages) => [
+          ...currentMessages,
+          {
+            role: "assistant",
+            content:
+              `I need your approval to perform ${data.action} ` +
+              `for order ${data.arguments.orderId}.`,
+          },
+        ]);
+
+        setPendingApproval({
+          action: data.action,
+          arguments: data.arguments,
+          toolCallId: data.toolCallId,
+        });
+      } else {
+        // Normal agent response.
+        setMessages((currentMessages) => [
+          ...currentMessages,
+          {
+            role: "assistant",
+            content: data.message || data.error || "No response received.",
+          },
+        ]);
+      }
     } catch (error) {
       // Handle network/API errors so the UI doesn't silently fail.
       setMessages((currentMessages) => [
@@ -116,6 +143,54 @@ function App() {
     }
   }
 
+  async function handleApproval() {
+    if (!pendingApproval || loading) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/approval", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // The server already knows which action is pending.
+          // We only tell it which conversation is approving it.
+          sessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      // The approval request has now been handled,
+      // so remove the approval card from the UI.
+      setPendingApproval(null);
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "assistant",
+          content: data.message || data.error || "No response received.",
+        },
+      ]);
+    } catch (error) {
+      console.error("Approval request failed:", error);
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "assistant",
+          content: "Sorry, I couldn't process the approval.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="chat-container">
       <header className="chat-header">
@@ -128,7 +203,9 @@ function App() {
           <div key={index} className={`message ${message.role}`}>
             <strong>{message.role === "user" ? "You" : "Agent"}</strong>
 
-            <p>{message.content}</p>
+            <div className="message-content">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
           </div>
         ))}
 
@@ -136,6 +213,67 @@ function App() {
           <div className="message assistant">
             <strong>Agent</strong>
             <p>Thinking...</p>
+          </div>
+        )}
+
+        {pendingApproval && (
+          <div className="approval-card">
+            <strong>⚠️ Approval required</strong>
+
+            <p>
+              The agent wants to perform:
+              <strong> {pendingApproval.action}</strong>
+            </p>
+
+            <p>
+              Order ID: <strong>{pendingApproval.arguments.orderId}</strong>
+            </p>
+
+            <div className="approval-actions">
+              <button type="button" onClick={handleApproval}>
+                Approve
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const response = await fetch("/api/approval/reject", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        // The server uses the session ID to find the
+                        // pending approval stored in MongoDB.
+                        sessionId,
+                      }),
+                    });
+
+                    const data = await response.json();
+
+                    // Remove the approval card from the UI.
+                    setPendingApproval(null);
+
+                    // Tell the user what happened.
+                    setMessages((currentMessages) => [
+                      ...currentMessages,
+                      {
+                        role: "assistant",
+                        content:
+                          data.message ||
+                          data.error ||
+                          "The cancellation request was rejected.",
+                      },
+                    ]);
+                  } catch (error) {
+                    console.error("Approval rejection failed:", error);
+                  }
+                }}
+              >
+                Reject
+              </button>
+            </div>
           </div>
         )}
       </main>

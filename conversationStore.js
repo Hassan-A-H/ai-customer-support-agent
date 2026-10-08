@@ -25,3 +25,37 @@ export async function saveConversation(sessionId, messages) {
     { upsert: true },
   );
 }
+
+// Store a sensitive action that is waiting for human approval.
+//
+// The important point is that the server stores the action itself.
+// The browser does not become the source of truth for what should
+// be executed.
+export async function savePendingApproval(sessionId, approval) {
+  await conversations.updateOne(
+    { sessionId },
+    {
+      $set: {
+        pendingApproval: approval,
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+}
+
+// Remove the pending approval after it has either been approved
+// or rejected.
+export async function clearPendingApproval(sessionId) {
+  await conversations.updateOne(
+    { sessionId },
+    {
+      $unset: {
+        pendingApproval: "",
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    },
+  );
+}

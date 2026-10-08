@@ -1,6 +1,11 @@
 import express from "express";
-import { runAgent } from "./agent.js";
-import { getConversation, saveConversation } from "./conversationStore.js";
+import { runAgent, resumeApprovedAction } from "./agent.js";
+import {
+  getConversation,
+  saveConversation,
+  savePendingApproval,
+  clearPendingApproval,
+} from "./conversationStore.js";
 
 const app = express();
 
@@ -74,10 +79,29 @@ app.post("/chat", async (req, res) => {
       await saveConversation(sessionId, result.messages);
     }
 
+    // If the agent paused because a sensitive action needs approval,
+    // store the exact action on the server.
+    //
+    // The browser can display this information, but the server remains
+    // the source of truth for what will eventually be executed.
+    if (result.requiresApproval) {
+      await savePendingApproval(sessionId, {
+        action: result.action,
+        arguments: result.arguments,
+        toolCallId: result.toolCallId,
+      });
+    }
+
     res.json({
       success: result.success,
-      message: result.message,
+      message: result.message ?? "",
       requiresApproval: result.requiresApproval ?? false,
+
+      // Send these only when the agent is waiting for
+      // human approval of a sensitive action.
+      action: result.action ?? null,
+      arguments: result.arguments ?? null,
+      toolCallId: result.toolCallId ?? null,
     });
   } catch (error) {
     console.error("Agent error:", error);
@@ -87,6 +111,107 @@ app.post("/chat", async (req, res) => {
     });
   }
 });
+
+// Resume an agent action after the human explicitly approves it.
+app.post("/approval", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        error: "Session ID is required.",
+      });
+    }
+
+    // Load the conversation and the pending approval stored
+    // by the server when the agent paused.
+    const conversation = await getConversation(sessionId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        error: "Conversation not found.",
+      });
+    }
+
+    if (!conversation.pendingApproval) {
+      return res.status(400).json({
+        error: "There is no pending approval for this conversation.",
+      });
+    }
+
+    const {
+      action,
+      arguments: arguments_,
+      toolCallId,
+    } = conversation.pendingApproval;
+
+    // Resume the interrupted agent run using the action that
+    // the server previously stored.
+    const result = await resumeApprovedAction(
+      conversation.messages,
+      action,
+      arguments_,
+      toolCallId,
+    );
+
+    // Save the completed conversation.
+    await saveConversation(sessionId, result.messages);
+
+    // The approval has now been consumed, so remove it.
+    await clearPendingApproval(sessionId);
+
+    res.json({
+      success: result.success,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error("Approval failed:", error);
+
+    res.status(500).json({
+      error: "Failed to execute the approved action.",
+    });
+  }
+});
+
+// Reject a pending sensitive action.
+//
+// The action is not executed. We simply remove the pending
+// approval from the server-side conversation state.
+app.post("/approval/reject", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        error: "Session ID is required.",
+      });
+    }
+
+    // Make sure the conversation actually exists.
+    const conversation = await getConversation(sessionId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        error: "Conversation not found.",
+      });
+    }
+
+    // Remove the pending action without executing it.
+    await clearPendingApproval(sessionId);
+
+    res.json({
+      success: true,
+      message: "The pending action was rejected.",
+    });
+  } catch (error) {
+    console.error("Approval rejection failed:", error);
+
+    res.status(500).json({
+      error: "Failed to reject the pending action.",
+    });
+  }
+});
+
 const PORT = 3000;
 
 app.listen(PORT, () => {

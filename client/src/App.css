@@ -85,3 +85,22 @@
   cursor: pointer;
   font-size: 16px;
 }
+
+/* Markdown content inside chat messages */
+.message-content p {
+  margin: 6px 0;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.message-content li {
+  margin-bottom: 4px;
+}
+
+.message-content strong {
+  font-weight: 700;
+}
