@@ -1,10 +1,6 @@
 import express from "express";
 import { runAgent } from "./agent.js";
-
-// Temporary in-memory store for conversation state.
-// Later, MongoDB will replace this so conversations survive
-// server restarts and can be shared across users/devices.
-const conversations = new Map();
+import { getConversation, saveConversation } from "./conversationStore.js";
 
 const app = express();
 
@@ -27,22 +23,18 @@ app.post("/chat", async (req, res) => {
       });
     }
 
-    // Get the existing conversation history for this session.
-    // If this is a new session, start with an empty history.
-    let messages = conversations.get(sessionId);
+    // Load the conversation history from MongoDB.
+    // If this is a new session, there will be no stored conversation.
+    const conversation = await getConversation(sessionId);
 
-    if (!messages) {
-      messages = undefined;
-    }
+    const messages = conversation?.messages;
 
-    // Run the agent using the conversation history.
+    // Run the agent using the stored conversation history.
     const result = await runAgent(message, messages);
 
-    // Save the updated conversation history.
-    // This allows the next request with the same sessionId
-    // to continue the previous conversation.
+    // Save the updated conversation back to MongoDB.
     if (result.messages) {
-      conversations.set(sessionId, result.messages);
+      await saveConversation(sessionId, result.messages);
     }
 
     res.json({
