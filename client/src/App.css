@@ -1,0 +1,87 @@
+/* Main chat layout */
+.chat-container {
+  width: 100%;
+  max-width: 900px;
+  height: 90vh;
+  margin: 5vh auto;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+  color: #222;
+
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Header */
+.chat-header {
+  padding: 24px;
+  border-bottom: 1px solid #ddd;
+}
+
+.chat-header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.chat-header p {
+  margin: 0;
+  color: #666;
+}
+
+/* Area where messages appear */
+.chat-messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* Individual message */
+.message {
+  max-width: 70%;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+
+.message p {
+  margin: 6px 0 0;
+}
+
+/* User messages appear on the right */
+.message.user {
+  margin-left: auto;
+  background: #e3f2fd;
+}
+
+/* Agent messages appear on the left */
+.message.assistant {
+  margin-right: auto;
+  background: #f1f1f1;
+}
+
+/* Input area */
+.chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.chat-input button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}

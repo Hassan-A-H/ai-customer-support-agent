@@ -13,6 +13,43 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Load the conversation history for a session.
+// The React frontend uses this when the page is opened or refreshed.
+app.get("/conversation/:sessionId", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const conversation = await getConversation(sessionId);
+
+    // MongoDB stores the complete agent history, including
+    // system messages and internal tool calls.
+    //
+    // The UI only needs messages that are actually visible
+    // to the customer.
+    const messages = (conversation?.messages ?? [])
+      .filter(
+        (message) =>
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string" &&
+          message.content.trim() !== "",
+      )
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+
+    res.json({
+      messages,
+    });
+  } catch (error) {
+    console.error("Failed to load conversation:", error);
+
+    res.status(500).json({
+      error: "Failed to load conversation.",
+    });
+  }
+});
+
 app.post("/chat", async (req, res) => {
   try {
     const { sessionId, message } = req.body;
