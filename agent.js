@@ -436,6 +436,35 @@ export async function runAgent(userInput, messages = [systemMessage]) {
           tool_call_id: toolCall.id,
           content: JSON.stringify(result),
         });
+
+        // Support-ticket creation changes business data, so the
+        // application generates the confirmation directly from the
+        // authoritative ticket result. This prevents the LLM from
+        // inventing follow-up actions or guarantees.
+        if (toolName === "create_support_ticket") {
+          const message =
+            `I've created support ticket **${result.id}** for your issue.\n\n` +
+            `- **Customer ID:** ${result.customerId}\n` +
+            `- **Order ID:** ${result.orderId}\n` +
+            `- **Subject:** ${result.subject}\n` +
+            `- **Description:** ${result.description}\n` +
+            `- **Status:** ${result.status}\n` +
+            `- **Created At:** ${result.createdAt}`;
+
+          messages.push({
+            role: "assistant",
+            content: message,
+          });
+
+          // The application has already generated the authoritative
+          // confirmation from the tool result, so do not send the
+          // tool result back to the LLM for another response.
+          return {
+            success: true,
+            message,
+            messages,
+          };
+        }
       } catch (error) {
         messages.push({
           role: "tool",

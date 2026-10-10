@@ -167,8 +167,8 @@ app.post("/approval", async (req, res) => {
   } catch (error) {
     console.error("Approval failed:", error);
 
-    res.status(500).json({
-      error: "Failed to execute the approved action.",
+    res.status(400).json({
+      error: error.message,
     });
   }
 });

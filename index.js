@@ -336,6 +336,10 @@ Rules:
     Do not mention refunds, notifications, emails, new orders, or other
     possible follow-up actions unless they were explicitly requested by
     the customer or confirmed by a tool.
+
+14. Do not treat the purchase date as the delivery date.
+    If a policy depends on the delivery date and the user only provides
+    a purchase date, do not determine eligibility from the purchase date alone.
 `,
   },
 ];

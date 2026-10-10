@@ -21,6 +21,8 @@ function App() {
     },
   ]);
 
+  const [approvalLoading, setApprovalLoading] = useState(false);
+
   // Load the previous conversation from MongoDB when the app starts.
   useEffect(() => {
     async function loadConversation() {
@@ -143,7 +145,12 @@ function App() {
     }
   }
 
+  // Approve the pending sensitive action.
+  //
+  // The server retrieves the pending action from MongoDB,
+  // executes it, and returns the result.
   async function handleApproval() {
+    setApprovalLoading(true);
     if (!pendingApproval || loading) {
       return;
     }
@@ -188,6 +195,49 @@ function App() {
       ]);
     } finally {
       setLoading(false);
+      setApprovalLoading(false);
+    }
+  }
+
+  // Reject the pending sensitive action.
+  //
+  // The server uses the session ID to find the pending approval
+  // and removes it without executing the action.
+  async function handleReject() {
+    setApprovalLoading(true);
+    try {
+      const response = await fetch("/api/approval/reject", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // The server uses the session ID to find the
+          // pending approval stored in MongoDB.
+          sessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Remove the approval card from the UI.
+      setPendingApproval(null);
+
+      // Tell the user what happened.
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "assistant",
+          content:
+            data.message ||
+            data.error ||
+            "The cancellation request was rejected.",
+        },
+      ]);
+    } catch (error) {
+      console.error("Approval rejection failed:", error);
+    } finally {
+      setApprovalLoading(false);
     }
   }
 
@@ -230,48 +280,20 @@ function App() {
             </p>
 
             <div className="approval-actions">
-              <button type="button" onClick={handleApproval}>
-                Approve
+              <button
+                type="button"
+                onClick={handleApproval}
+                disabled={approvalLoading}
+              >
+                {approvalLoading ? "Processing..." : "Approve"}
               </button>
 
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    const response = await fetch("/api/approval/reject", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        // The server uses the session ID to find the
-                        // pending approval stored in MongoDB.
-                        sessionId,
-                      }),
-                    });
-
-                    const data = await response.json();
-
-                    // Remove the approval card from the UI.
-                    setPendingApproval(null);
-
-                    // Tell the user what happened.
-                    setMessages((currentMessages) => [
-                      ...currentMessages,
-                      {
-                        role: "assistant",
-                        content:
-                          data.message ||
-                          data.error ||
-                          "The cancellation request was rejected.",
-                      },
-                    ]);
-                  } catch (error) {
-                    console.error("Approval rejection failed:", error);
-                  }
-                }}
+                onClick={handleReject}
+                disabled={approvalLoading}
               >
-                Reject
+                {approvalLoading ? "Processing..." : "Reject"}
               </button>
             </div>
           </div>
